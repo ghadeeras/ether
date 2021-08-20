@@ -1,0 +1,43 @@
+{
+  "name": "ether",
+  "version": "1.0.0",
+  "description": "A linear algebra and a basic math/physics library for graphics, gaming, and simulation applications.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "nyc --reporter=html -- mocha --require esm --require source-map-support/register --recursive \"./root/ether/test/js/**/*.test.js\"",
+    "pretest": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ghadeeras/ether.git"
+  },
+  "keywords": [
+    "linear algebra",
+    "math",
+    "physics",
+    "graphics",
+    "gaming",
+    "simulation"
+  ],
+  "author": "Ghadeer Abou-Saleh",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/ghadeeras/ether/issues"
+  },
+  "homepage": "https://github.com/ghadeeras/ether#readme",
+  "devDependencies": {
+    "@types/chai": "^4.2.14",
+    "@types/mocha": "^8.2.0",
+    "@types/seedrandom": "^3.0.1",
+    "chai": "^4.3.0",
+    "esm": "^3.2.25",
+    "mocha": "^8.2.1",
+    "nyc": "^15.1.0",
+    "seedrandom": "^3.0.5",
+    "source-map-support": "^0.5.19"
+  },
+  "dependencies": {
+    "@types/node": "^14.14.25"
+  }
+}
