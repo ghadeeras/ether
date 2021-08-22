@@ -1,6 +1,6 @@
 import seedRandom from "seedrandom"
 import { Context, Suite } from "mocha"
-import { Dim, mat2, mat3, mat4, MatMath, Vec, vec2, vec3, vec4, VecMath } from "../../prod"
+import { Dim, Mat, mat2, mat3, mat4, MatMath, Vec, vec2, vec3, vec4, VecMath } from "../../prod"
 import { expect } from "chai"
 import { fail } from "assert"
 
@@ -11,9 +11,11 @@ export type MultiDimArray = number[] | MultiDimArray[]
 export class MathContext<D extends Dim> {
     
     readonly vecGen: () => Vec<D>
+    readonly matGen: () => Mat<D>
     
     constructor(readonly gen: NumberGen, readonly vec: VecMath<D>, readonly mat: MatMath<D>) {
         this.vecGen = vec.gen(gen)
+        this.matGen = mat.gen(this.vecGen)
     }
 
     *scalars() {
@@ -28,9 +30,29 @@ export class MathContext<D extends Dim> {
         }
     }
 
+    *matrices() {
+        while (true) {
+            yield this.matGen()
+        }
+    }
+
 }
 
-export function approximateEquality(expected: MultiDimArray, epsilon: number = Math.pow(2, -24)): (actual: MultiDimArray) => boolean {
+export function math4(gen: NumberGen): MathContext<4> {
+    return new MathContext(gen, vec4, mat4)
+}
+
+export function math3(gen: NumberGen): MathContext<3> {
+    return new MathContext(gen, vec3, mat3)
+}
+
+export function math2(gen: NumberGen): MathContext<2> {
+    return new MathContext(gen, vec2, mat2)
+}
+
+export const EPSILON = Math.pow(2, -24)
+
+export function approximateEquality(expected: MultiDimArray, epsilon: number = EPSILON): (actual: MultiDimArray) => boolean {
     return actual => {
         if (actual === expected) {
             return true

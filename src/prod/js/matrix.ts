@@ -4,6 +4,8 @@ export type Mat<D extends vec.Dim> = vec.Tuple<vec.Vec<D>, D>
 
 export interface MatMath<D extends vec.Dim> {
 
+    gen(...columns: [() => vec.Vec<D>] | vec.Tuple<() => vec.Vec<D>, D>): () => Mat<D>
+
     identity(): Mat<D>
 
     apply(m: Mat<D>, v: vec.Vec<D>): vec.Vec<D>
@@ -29,6 +31,13 @@ export interface MatMath<D extends vec.Dim> {
 }
 
 export class Mat4Math implements MatMath<4> {
+
+    gen(...columns: [() => vec.Vec<4>] | vec.Tuple<() => vec.Vec<4>, 4>): () => Mat<4> {
+        const column = columns[0]
+        return columns.length == 1 ?
+            () => [column(), column(), column(), column()] :
+            () => [columns[0](), columns[1](), columns[2](), columns[3]()]
+    }
 
     identity(): Mat<4> {
         return this.scaling(1, 1, 1)
@@ -116,7 +125,12 @@ export class Mat4Math implements MatMath<4> {
     }
 
     apply(m: Mat<4>, v: vec.Vec<4>): vec.Vec<4> {
-        return vec.vec4.prod(v, this.transpose(m))
+        return vec.vec4.addAll(
+            vec.vec4.scale(m[0], v[0]),
+            vec.vec4.scale(m[1], v[1]),
+            vec.vec4.scale(m[2], v[2]),
+            vec.vec4.scale(m[3], v[3])
+        )
     }
 
     neg(m: Mat<4>): Mat<4> {
@@ -156,13 +170,12 @@ export class Mat4Math implements MatMath<4> {
     }
 
     mul(m1: Mat<4>, m2: Mat<4>): Mat<4> {
-        const m1Rows = this.transpose(m1)
-        return this.transpose([
-            vec.vec4.prod(m1Rows[0], m2),
-            vec.vec4.prod(m1Rows[1], m2),
-            vec.vec4.prod(m1Rows[2], m2),
-            vec.vec4.prod(m1Rows[3], m2)
-        ])
+        return [
+            this.apply(m1, m2[0]),
+            this.apply(m1, m2[1]),
+            this.apply(m1, m2[2]),
+            this.apply(m1, m2[3])
+        ]
     }
 
     determinant(m: Mat<4>): number {
@@ -219,6 +232,13 @@ export class Mat4Math implements MatMath<4> {
 
 export class Mat3Math implements MatMath<3> {
 
+    gen(...columns: [() => vec.Vec<3>] | vec.Tuple<() => vec.Vec<3>, 3>): () => Mat<3> {
+        const column = columns[0]
+        return columns.length == 1 ?
+            () => [column(), column(), column()] :
+            () => [columns[0](), columns[1](), columns[2]()]
+    }
+
     identity(): Mat<3> {
         return this.scaling(1, 1, 1)
     }
@@ -260,7 +280,11 @@ export class Mat3Math implements MatMath<3> {
     }
 
     apply(m: Mat<3>, v: vec.Vec<3>): vec.Vec<3> {
-        return vec.vec3.prod(v, this.transpose(m))
+        return vec.vec3.addAll(
+            vec.vec3.scale(m[0], v[0]),
+            vec.vec3.scale(m[1], v[1]),
+            vec.vec3.scale(m[2], v[2])
+        )
     }
 
     neg(m: Mat<3>): Mat<3> {
@@ -296,12 +320,11 @@ export class Mat3Math implements MatMath<3> {
     }
 
     mul(m1: Mat<3>, m2: Mat<3>): Mat<3> {
-        const m1Rows = this.transpose(m1)
-        return this.transpose([
-            vec.vec3.prod(m1Rows[0], m2),
-            vec.vec3.prod(m1Rows[1], m2),
-            vec.vec3.prod(m1Rows[2], m2)
-        ])
+        return [
+            this.apply(m1, m2[0]),
+            this.apply(m1, m2[1]),
+            this.apply(m1, m2[2])
+        ]
     }
 
     determinant(m: Mat<3>): number {
@@ -353,6 +376,13 @@ export class Mat3Math implements MatMath<3> {
 
 export class Mat2Math implements MatMath<2> {
 
+    gen(...columns: [() => vec.Vec<2>] | vec.Tuple<() => vec.Vec<2>, 2>): () => Mat<2> {
+        const column = columns[0]
+        return columns.length == 1 ?
+            () => [column(), column()] :
+            () => [columns[0](), columns[1]()]
+    }
+
     identity(): Mat<2> {
         return this.scaling(1, 1)
     }
@@ -365,7 +395,10 @@ export class Mat2Math implements MatMath<2> {
     }
 
     apply(m: Mat<2>, v: vec.Vec<2>): vec.Vec<2> {
-        return vec.vec2.prod(v, this.transpose(m))
+        return vec.vec2.add(
+            vec.vec2.scale(m[0], v[0]),
+            vec.vec2.scale(m[1], v[1])
+        )
     }
 
     neg(m: Mat<2>): Mat<2> {
@@ -397,11 +430,10 @@ export class Mat2Math implements MatMath<2> {
     }
 
     mul(m1: Mat<2>, m2: Mat<2>): Mat<2> {
-        const m1Rows = this.transpose(m1)
-        return this.transpose([
-            vec.vec2.prod(m1Rows[0], m2),
-            vec.vec2.prod(m1Rows[1], m2)
-        ])
+        return [
+            this.apply(m1, m2[0]),
+            this.apply(m1, m2[1])
+        ]
     }
 
     determinant(m: Mat<2>): number {
