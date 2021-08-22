@@ -132,8 +132,8 @@ describe("vector", using(() => {
         it("produces a vector perpendicular on operand vectors", using(() => {
             const [v3D1, v3D2] = m3.vectors()
             const v3D = vec3.cross(v3D1, v3D2)
-            expect(vec3.dot(v3D, v3D1)).to.closeTo(0, EPSILON)
-            expect(vec3.dot(v3D, v3D2)).to.closeTo(0, EPSILON)
+            m3.expectToBePerpendicular(v3D, v3D1)
+            m3.expectToBePerpendicular(v3D, v3D2)
         }))
 
         it("is distributive", using(() => {
@@ -180,6 +180,37 @@ describe("vector", using(() => {
             const a2b2 = vec3.lengthSquared(a) * vec3.lengthSquared(b)
             const ab2 = Math.pow(vec3.dot(a, b), 2)
             expect(axb2).to.be.closeTo(a2b2 - ab2, EPSILON)
+        }))
+
+    }))
+
+    describe("project", using(() => {
+
+        it("produces a vector component that is parallel to a given vector", forEachMath(math => {
+            const [v1, v2] = math.vectors()
+            const v = math.vec.project(v1, v2)
+            math.expectToBeParallel(v, v2)
+        }))
+
+        it("produces a vector component that is perpendicular to the reject", forEachMath(math => {
+            const [v1, v2] = math.vectors()
+            const p = math.vec.project(v1, v2)
+            const r = math.vec.reject(v1, v2)
+            math.expectToBePerpendicular(p, r)
+        }))
+
+        it("it decomposes (with the reject) the original vector", forEachMath(math => {
+            const [v1, v2] = math.vectors()
+            const p = math.vec.project(v1, v2)
+            const r = math.vec.reject(v1, v2)
+            expect(math.vec.add(p, r)).to.satisfy(approximateEquality(v1))
+        }))
+
+        it("can be expressed as a matrix", forEachMath(math => {
+            const [v1, v2] = math.vectors()
+            const p = math.vec.project(v1, v2)
+            const m = math.mat.projectionOn(v2)
+            expect(math.mat.apply(m, v1)).to.satisfy(approximateEquality(p))
         }))
 
     }))

@@ -8,6 +8,10 @@ export interface MatMath<D extends vec.Dim> {
 
     identity(): Mat<D>
 
+    outer(v1: vec.Vec<D>, v2: vec.Vec<D>): Mat<D>
+
+    projectionOn(v: vec.Vec<D>): Mat<D>
+
     apply(m: Mat<D>, v: vec.Vec<D>): vec.Vec<D>
 
     neg(m: Mat<D>): Mat<D>
@@ -41,6 +45,19 @@ export class Mat4Math implements MatMath<4> {
 
     identity(): Mat<4> {
         return this.scaling(1, 1, 1)
+    }
+
+    outer(v1: vec.Vec<4>, v2: vec.Vec<4>): Mat<4> {
+        return [
+            vec.vec4.scale(v1, v2[0]),
+            vec.vec4.scale(v1, v2[1]),
+            vec.vec4.scale(v1, v2[2]),
+            vec.vec4.scale(v1, v2[3])
+        ]
+    }
+
+    projectionOn(v: vec.Vec<4>): Mat<4> {
+        return this.scale(this.outer(v, v), 1 / vec.vec4.lengthSquared(v))
     }
 
     scaling(...diagonal: vec.Vec<3>): Mat<4> {
@@ -181,10 +198,10 @@ export class Mat4Math implements MatMath<4> {
     determinant(m: Mat<4>): number {
         const col0 = m[0]
         return (
-            col0[0] * this.subDet(m, 0, 0) -
-            col0[1] * this.subDet(m, 0, 1) +
-            col0[2] * this.subDet(m, 0, 2) -
-            col0[3] * this.subDet(m, 0, 3)
+            col0[0] * this.minor(m, 0, 0) -
+            col0[1] * this.minor(m, 0, 1) +
+            col0[2] * this.minor(m, 0, 2) -
+            col0[3] * this.minor(m, 0, 3)
         ) 
     }
 
@@ -198,12 +215,23 @@ export class Mat4Math implements MatMath<4> {
     }
 
     inverse(m: Mat<4>): Mat<4> {
+        const min00 = this.minor(m, 0, 0)
+        const min01 = this.minor(m, 0, 1)
+        const min02 = this.minor(m, 0, 2)
+        const min03 = this.minor(m, 0, 3)
+        const col0 = m[0]
+        const det = (
+            col0[0] * min00 -
+            col0[1] * min01 +
+            col0[2] * min02 -
+            col0[3] * min03
+        )
         return this.scale([
-            [+this.subDet(m, 0, 0), -this.subDet(m, 1, 0), +this.subDet(m, 2, 0), -this.subDet(m, 3, 0)],
-            [-this.subDet(m, 0, 1), +this.subDet(m, 1, 1), -this.subDet(m, 2, 1), +this.subDet(m, 3, 1)],
-            [+this.subDet(m, 0, 2), -this.subDet(m, 1, 2), +this.subDet(m, 2, 2), -this.subDet(m, 3, 2)],
-            [-this.subDet(m, 0, 3), +this.subDet(m, 1, 3), -this.subDet(m, 2, 3), +this.subDet(m, 3, 3)]
-        ], 1 / this.determinant(m))
+            [+min00, -this.minor(m, 1, 0), +this.minor(m, 2, 0), -this.minor(m, 3, 0)],
+            [-min01, +this.minor(m, 1, 1), -this.minor(m, 2, 1), +this.minor(m, 3, 1)],
+            [+min02, -this.minor(m, 1, 2), +this.minor(m, 2, 2), -this.minor(m, 3, 2)],
+            [-min03, +this.minor(m, 1, 3), -this.minor(m, 2, 3), +this.minor(m, 3, 3)]
+        ], 1 / det)
     }
 
     columnMajorArray(m: Mat<4>): number[] {
@@ -215,7 +243,7 @@ export class Mat4Math implements MatMath<4> {
         ]
     }
 
-    private subDet(m: Mat<4>, col: vec.Component<4>, row: vec.Component<4>): number {
+    private minor(m: Mat<4>, col: vec.Component<4>, row: vec.Component<4>): number {
         return mat3.determinant(this.subMat(m, col, row))
     }
 
@@ -241,6 +269,18 @@ export class Mat3Math implements MatMath<3> {
 
     identity(): Mat<3> {
         return this.scaling(1, 1, 1)
+    }
+
+    outer(v1: vec.Vec<3>, v2: vec.Vec<3>): Mat<3> {
+        return [
+            vec.vec3.scale(v1, v2[0]),
+            vec.vec3.scale(v1, v2[1]),
+            vec.vec3.scale(v1, v2[2])
+        ]
+    }
+
+    projectionOn(v: vec.Vec<3>): Mat<3> {
+        return this.scale(this.outer(v, v), 1 / vec.vec3.lengthSquared(v))
     }
 
     scaling(...diagonal: vec.Vec<3>): Mat<3> {
@@ -328,12 +368,7 @@ export class Mat3Math implements MatMath<3> {
     }
 
     determinant(m: Mat<3>): number {
-        const col0 = m[0]
-        return (
-            col0[0] * this.subDet(m, 0, 0) -
-            col0[1] * this.subDet(m, 0, 1) +
-            col0[2] * this.subDet(m, 0, 2)
-        ) 
+        return vec.vec3.dot(vec.vec3.cross(m[0], m[1]), m[2])
     }
 
     transpose(m: Mat<3>): Mat<3> {
@@ -345,11 +380,11 @@ export class Mat3Math implements MatMath<3> {
     }
 
     inverse(m: Mat<3>): Mat<3> {
-        return this.scale([
-            [+this.subDet(m, 0, 0), -this.subDet(m, 1, 0), +this.subDet(m, 2, 1)],
-            [-this.subDet(m, 0, 1), +this.subDet(m, 1, 1), -this.subDet(m, 2, 1)],
-            [+this.subDet(m, 0, 2), -this.subDet(m, 1, 2), +this.subDet(m, 2, 2)]
-        ], 1 / this.determinant(m))
+        const v1x2 = vec.vec3.cross(m[1], m[2])
+        const v2x0 = vec.vec3.cross(m[2], m[0])
+        const v0x1 = vec.vec3.cross(m[0], m[1])
+        const det = vec.vec3.dot(v0x1, m[2])
+        return this.scale(this.transpose([v1x2, v2x0, v0x1]), 1 / det)
     }
 
     columnMajorArray(m: Mat<3>): number[] {
@@ -357,18 +392,6 @@ export class Mat3Math implements MatMath<3> {
             ...m[0],
             ...m[1],
             ...m[2]
-        ]
-    }
-
-    private subDet(m: Mat<3>, col: vec.Component<3>, row: vec.Component<3>): number {
-        return mat2.determinant(this.subMat(m, col, row))
-    }
-
-    private subMat(m: Mat<3>, col: vec.Component<3>, row: vec.Component<3>): Mat<2> {
-        const m3x4: vec.Tuple<vec.Vec<3>, 2> = vec.deleteComponent<vec.Vec<3>, 3>(m, col)
-        return [
-            vec.deleteComponent<number, 3>(m3x4[0], row),
-            vec.deleteComponent<number, 3>(m3x4[1], row)
         ]
     }
 
@@ -385,6 +408,17 @@ export class Mat2Math implements MatMath<2> {
 
     identity(): Mat<2> {
         return this.scaling(1, 1)
+    }
+
+    outer(v1: vec.Vec<2>, v2: vec.Vec<2>): Mat<2> {
+        return [
+            vec.vec2.scale(v1, v2[0]),
+            vec.vec2.scale(v1, v2[1])
+        ]
+    }
+
+    projectionOn(v: vec.Vec<2>): Mat<2> {
+        return this.scale(this.outer(v, v), 1 / vec.vec2.lengthSquared(v))
     }
 
     scaling(...diagonal: vec.Vec<2>): Mat<2> {

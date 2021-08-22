@@ -68,6 +68,10 @@ export interface VecMath<D extends Dim> {
 
     prod(v: Vec<D>, m: Mat<D>): Vec<D>
 
+    project(v1: Vec<D>, v2: Vec<D>): Vec<D>
+
+    reject(v1: Vec<D>, v2: Vec<D>): Vec<D>
+
 }
 
 abstract class VecMathBase<D extends Dim> implements VecMath<D> {
@@ -111,6 +115,10 @@ abstract class VecMathBase<D extends Dim> implements VecMath<D> {
     abstract dot(v1: Vec<D>, v2: Vec<D>): number
 
     abstract prod(v: Vec<D>, m: Mat<D>): Vec<D>
+
+    abstract project(v1: Vec<D>, v2: Vec<D>): Vec<D>
+
+    abstract reject(v1: Vec<D>, v2: Vec<D>): Vec<D>
 
     lengthSquared(v: Vec<D>): number {
         return this.dot(v, v)
@@ -160,6 +168,14 @@ export abstract class ImmutableVecMathBase<D extends Dim> extends VecMathBase<D>
 
     minAll(v: Vec<D>, ...vs: Vec<D>[]): Vec<D> {
         return this.mutable.minAll([...v], ...vs)
+    }
+
+    project(v1: Vec<D>, v2: Vec<D>): Vec<D> {
+        return this.scale(v2, this.dot(v1, v2) / this.lengthSquared(v2))
+    }
+
+    reject(v1: Vec<D>, v2: Vec<D>): Vec<D> {
+        return this.sub(v1, this.project(v1, v2))
     }
 
 }
@@ -558,6 +574,14 @@ export abstract class MutableVecMathBase<D extends Dim> extends VecMathBase<D> {
     
     prod(v: Vec<D>, m: Mat<D>): Vec<D> {
         return this.immutable.prod(v, m)
+    }
+
+    project(v1: Vec<D>, v2: Vec<D>): Vec<D> {
+        return this.immutable.project(v1, v2)
+    }
+
+    reject(v1: Vec<D>, v2: Vec<D>): Vec<D> {
+        return this.immutable.reject(v1, v2)
     }
 
 }

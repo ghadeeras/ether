@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { approximateEquality, forEachMath, using } from "./test.utils"
+import { approximateEquality, EPSILON, forEachMath, using } from "./test.utils"
 
 describe("matrix", using(() => {
 
@@ -109,6 +109,54 @@ describe("matrix", using(() => {
             expect(m12_T).to.satisfy(approximateEquality(m2T_m1T))
         }))
     
+    }))
+
+    describe("determinant", using(() => {
+
+        it("produces 1 for identity matrix", forEachMath(math => {
+            expect(math.mat.determinant(math.mat.identity())).to.equal(1)
+        }))
+
+        it("produces same determinant for transpose matrix", forEachMath(math => {
+            const m = math.matGen()
+            const mT = math.mat.transpose(m)
+            expect(math.mat.determinant(mT)).to.be.closeTo(math.mat.determinant(m), EPSILON)
+        }))
+
+        it("produces reciprocal determinant for inverse matrix", forEachMath(math => {
+            const m = math.matGen()
+            const invM = math.mat.inverse(m)
+            const detM = math.mat.determinant(m)
+            const detInvM = math.mat.determinant(invM)
+            expect(detInvM * detM).to.be.closeTo(1, EPSILON)
+        }))
+
+        it("produces product of determinants for matrix product", forEachMath(math => {
+            const [m1, m2] = math.matrices()
+            const m = math.mat.mul(m1, m2)
+            const [det, det1, det2] = [math.mat.determinant(m), math.mat.determinant(m1), math.mat.determinant(m2)] 
+            expect(det).to.be.closeTo(det1 * det2, EPSILON)
+        }))
+
+        it("produces zero for outer products", forEachMath(math => {
+            const [v1, v2] = math.vectors()
+            const m = math.mat.outer(v1, v2)
+            expect(math.mat.determinant(m)).to.be.closeTo(0, EPSILON)
+        }))
+
+    }))
+
+    describe("inverse", using(() => {
+
+        it("inverses a matrix", forEachMath(math => {
+            const m = math.matGen()
+            const invM = math.mat.inverse(m)
+            const i1 = math.mat.mul(m, invM)
+            const i2 = math.mat.mul(invM, m)
+            expect(i1).to.satisfy(approximateEquality(math.mat.identity()))
+            expect(i2).to.satisfy(approximateEquality(math.mat.identity()))
+        }))
+        
     }))
 
 }))

@@ -36,6 +36,22 @@ export class MathContext<D extends Dim> {
         }
     }
 
+    expectToBeParallel(v1: Vec<D>, v2: Vec<D>) {
+        expect(Math.abs(this.vec.dot(v1, v2))).to.be.closeTo(this.vec.length(v1) * this.vec.length(v2), EPSILON)
+    }    
+
+    expectToBePerpendicular(v1: Vec<D>, v2: Vec<D>) {
+        expect(Math.abs(this.vec.dot(v1, v2))).to.be.closeTo(0, EPSILON)
+    }    
+
+    expectToBeInSameDirection(v1: Vec<D>, v2: Vec<D>) {
+        expect(this.vec.dot(v1, v2)).to.be.greaterThan(EPSILON)
+    }    
+
+    expectToBeInOppositeDirection(v1: Vec<D>, v2: Vec<D>) {
+        expect(this.vec.dot(v1, v2)).to.be.lessThan(-EPSILON)
+    }    
+
 }
 
 export function math4(gen: NumberGen): MathContext<4> {
