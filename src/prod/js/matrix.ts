@@ -8,6 +8,8 @@ export interface MatMath<D extends vec.Dim> {
 
     identity(): Mat<D>
 
+    diagonal(...d: vec.Vec<D>): Mat<D>
+
     outer(v1: vec.Vec<D>, v2: vec.Vec<D>): Mat<D>
 
     projectionOn(v: vec.Vec<D>): Mat<D>
@@ -44,7 +46,16 @@ export class Mat4Math implements MatMath<4> {
     }
 
     identity(): Mat<4> {
-        return this.scaling(1, 1, 1)
+        return this.diagonal(1, 1, 1, 1)
+    }
+
+    diagonal(...d: vec.Vec<4>): Mat<4> {
+        return [
+            [d[0],    0,    0,    0],
+            [   0, d[1],    0,    0],
+            [   0,    0, d[2],    0],
+            [   0,    0,    0, d[3]]
+        ]
     }
 
     outer(v1: vec.Vec<4>, v2: vec.Vec<4>): Mat<4> {
@@ -60,13 +71,12 @@ export class Mat4Math implements MatMath<4> {
         return this.scale(this.outer(v, v), 1 / vec.vec4.lengthSquared(v))
     }
 
+    scalingAlong(v: vec.Vec<3>, parallel: number = 1, perpendicular: number = 1): Mat<4> {
+        return this.cast(mat3.scalingAlong(v, parallel, perpendicular))
+    }
+
     scaling(...diagonal: vec.Vec<3>): Mat<4> {
-        return [
-            [diagonal[0],           0,           0, 0],
-            [0,           diagonal[1],           0, 0],
-            [0,                     0, diagonal[2], 0],
-            [0,                     0,           0, 1]
-        ]
+        return this.diagonal(...diagonal, 1)
     }
 
     translation(t: vec.Vec<3>): Mat<4> {
@@ -78,38 +88,51 @@ export class Mat4Math implements MatMath<4> {
         ]
     }
 
-    rotation(angle: number, axis: vec.Vec<3>): Mat<4> {
-        const [x, y, z] = vec.vec3.unit(axis);
-        if (Number.isNaN(x + y + z)) {
-            return mat4.identity()
-        }
+    rotationX(angle: number): Mat<4> {
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
-        const oneMinusCos = 1 - cos
-        const [xx, yy, zz, xy, yz, zx] = [x * x, y * y, z * z, x * y, y * z, z * x]
         return [
-            [xx * oneMinusCos +     cos, xy * oneMinusCos + z * sin, zx * oneMinusCos - y * sin, 0],
-            [xy * oneMinusCos - z * sin, yy * oneMinusCos +     cos, yz * oneMinusCos + x * sin, 0],
-            [zx * oneMinusCos + y * sin, yz * oneMinusCos - x * sin, zz * oneMinusCos +     cos, 0],
-            [                         0,                          0,                          0, 1]
+            [1,    0,    0, 0],
+            [0, +cos, +sin, 0],
+            [0, -sin, +cos, 0],
+            [0,    0,    0, 1]
         ]
     }
 
-    crossProdRotation(v1: vec.Vec<3>, v2: vec.Vec<3>, power: number) {
-        const u1 = vec.vec3.unit(v1)
-        const u2 = vec.vec3.unit(v2)
-        const axis = vec.vec3.cross(u1, u2)
-        const sin = vec.vec3.length(axis)
-        const cos = vec.vec3.dot(u1, u2)
-        const angle = Math.atan2(sin, cos)
-        return Number.isNaN(angle) ? this.identity() : this.rotation(power * angle, axis)
+    rotationY(angle: number): Mat<4> {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        return [
+            [+cos, 0, -sin, 0],
+            [   0, 1,    0, 0],
+            [+sin, 0, +cos, 0],
+            [   0, 0,    0, 1]
+        ]
+    }
+
+    rotationZ(angle: number): Mat<4> {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        return [
+            [+cos, +sin, 0, 0],
+            [-sin, +cos, 0, 0],
+            [   0,    0, 1, 0],
+            [   0,    0, 0, 1]
+        ]
+    }
+
+    rotation(angle: number, axis: vec.Vec<3>): Mat<4> {
+        return this.cast(mat3.rotation(angle, axis))
+    }
+
+    crossProdRotation(v1: vec.Vec<3>, v2: vec.Vec<3>, power: number = 1): Mat<4> {
+        return this.cast(mat3.crossProdRotation(v1, v2, power))
     }
 
     lookTowards(pos: vec.Vec<3>, dir: vec.Vec<3> = [0, 0, -1], up: vec.Vec<3> = [0, 1, 0]): Mat<4> {
-        return mat4.mul(
-            this.cast(mat3.lookTowards(dir, up)), 
-            this.translation(vec.vec3.neg(pos))
-        )
+        const r = mat3.lookTowards(dir, up)
+        const p = mat3.apply(r, vec.vec3.neg(pos))
+        return this.affine(r, p)
     }
 
     lookAt(pos: vec.Vec<3>, objPos: vec.Vec<3> = [0, 0, 0], up: vec.Vec<3> = [0, 1, 0]) {
@@ -125,6 +148,20 @@ export class Mat4Math implements MatMath<4> {
             [                 0,    0,    -(near + far) / range, -1],
             [                 0,    0, -2 * near * far  / range,  0]
         ];
+    }
+
+    translated(m: Mat<3>, t: vec.Vec<3>): Mat<4> {
+        const newT = vec.vec3.sub(t, mat3.apply(m, t))
+        return this.affine(m, newT)
+    }
+
+    affine(m: Mat<3>, t: vec.Vec<3>): Mat<4> {
+        return [
+            [...m[0], 0],
+            [...m[1], 0],
+            [...m[2], 0],
+            [   ...t, 1]
+        ]
     }
 
     cast(m: Mat<2> | Mat<3>): Mat<4> {
@@ -268,7 +305,15 @@ export class Mat3Math implements MatMath<3> {
     }
 
     identity(): Mat<3> {
-        return this.scaling(1, 1, 1)
+        return this.diagonal(1, 1, 1)
+    }
+
+    diagonal(...d: vec.Vec<3>): Mat<3> {
+        return [
+            [d[0],    0,    0],
+            [   0, d[1],    0],
+            [   0,    0, d[2]]
+        ]
     }
 
     outer(v1: vec.Vec<3>, v2: vec.Vec<3>): Mat<3> {
@@ -283,26 +328,95 @@ export class Mat3Math implements MatMath<3> {
         return this.scale(this.outer(v, v), 1 / vec.vec3.lengthSquared(v))
     }
 
+    scalingAlong(v: vec.Vec<3>, parallel: number = 1, perpendicular: number = 1): Mat<3> {
+        if (parallel === perpendicular) {
+            return this.diagonal(parallel, parallel, parallel)
+        }
+        const parallelProj = this.projectionOn(v)
+        const perpendicularProj = this.sub(this.identity(), this.projectionOn(v))
+        return this.add(
+            parallel === 1 ? parallelProj : this.scale(parallelProj, parallel),
+            perpendicular === 1 ? perpendicularProj : this.scale(perpendicularProj, perpendicular)
+        )
+    }
+
     scaling(...diagonal: vec.Vec<3>): Mat<3> {
+        return this.diagonal(...diagonal)
+    }
+
+    rotationX(angle: number): Mat<3> {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
         return [
-            [diagonal[0], 0, 0],
-            [0, diagonal[1], 0],
-            [0, 0, diagonal[2]]
+            [1,    0,    0],
+            [0, +cos, +sin],
+            [0, -sin, +cos]
+        ]
+    }
+
+    rotationY(angle: number): Mat<3> {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        return [
+            [+cos, 0, -sin],
+            [   0, 1,    0],
+            [+sin, 0, +cos]
+        ]
+    }
+
+    rotationZ(angle: number): Mat<3> {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        return [
+            [+cos, +sin, 0],
+            [-sin, +cos, 0],
+            [   0,    0, 1]
         ]
     }
 
     rotation(angle: number, axis: vec.Vec<3>): Mat<3> {
-        const [x, y, z] = vec.vec3.unit(axis);
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        const oneMinusCos = 1 - cos;
-        const [xx, yy, zz, xy, yz, zx] = [x * x, y * y, z * z, x * y, y * z, z * x];
-        return [
-            [xx * oneMinusCos +     cos, xy * oneMinusCos + z * sin, zx * oneMinusCos - y * sin],
-            [xy * oneMinusCos - z * sin, yy * oneMinusCos +     cos, yz * oneMinusCos + x * sin],
-            [zx * oneMinusCos + y * sin, yz * oneMinusCos - x * sin, zz * oneMinusCos +     cos]
-        ];
+        const unitAxis = vec.vec3.unit(axis)
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        return this.rotMat(cos, sin, ...unitAxis)
     }
+
+    crossProdRotation(v1: vec.Vec<3>, v2: vec.Vec<3>, power: number = 1): Mat<3> {
+        const u1 = vec.vec3.unit(v1)
+        const u2 = vec.vec3.unit(v2)
+        const axis = vec.vec3.cross(u1, u2)
+        const cos = vec.vec3.dot(u1, u2)
+        const sin = vec.vec3.length(axis)
+        if (power === 1) {
+            const unitAxis = vec.vec3.scale(axis, 1 / sin)
+            return this.rotMat(cos, sin, ...unitAxis)
+        } else {
+            const newAngle = power * Math.atan2(sin, cos)
+            return this.rotation(newAngle, axis)
+        }
+    }
+
+    private rotMat(cos: number, sin: number, x: number, y: number, z: number): Mat<3> {
+        if (Number.isNaN(cos + sin + x + y + z)) {
+            return this.identity()
+        }
+        const oneMinusCos = 1 - cos
+        const x1 = x * oneMinusCos
+        const y1 = y * oneMinusCos
+        const z1 = z * oneMinusCos
+        const xx = x * x1
+        const yy = y * y1
+        const zz = z * z1
+        const xy = x * y1
+        const yz = y * z1
+        const zx = z * x1
+        return [
+            [xx + cos, xy + z * sin, zx - y * sin],
+            [xy - z * sin, yy + cos, yz + x * sin],
+            [zx + y * sin, yz - x * sin, zz + cos]
+        ]
+    }
+
 
     lookTowards(dir: vec.Vec<3>, up: vec.Vec<3> = [0, 1, 0]): Mat<3> {
         const z = vec.vec3.unit(vec.vec3.neg(dir))
@@ -407,7 +521,14 @@ export class Mat2Math implements MatMath<2> {
     }
 
     identity(): Mat<2> {
-        return this.scaling(1, 1)
+        return this.diagonal(1, 1)
+    }
+
+    diagonal(...d: vec.Vec<2>): Mat<2> {
+        return [
+            [d[0],    0],
+            [   0, d[1]]
+        ]
     }
 
     outer(v1: vec.Vec<2>, v2: vec.Vec<2>): Mat<2> {
@@ -421,10 +542,28 @@ export class Mat2Math implements MatMath<2> {
         return this.scale(this.outer(v, v), 1 / vec.vec2.lengthSquared(v))
     }
 
+    scalingAlong(v: vec.Vec<2>, parallel: number = 1, perpendicular: number = 1): Mat<2> {
+        if (parallel === perpendicular) {
+            return this.diagonal(parallel, parallel)
+        }
+        const parallelProj = this.projectionOn(v)
+        const perpendicularProj = this.sub(this.identity(), this.projectionOn(v))
+        return this.add(
+            parallel === 1 ? parallelProj : this.scale(parallelProj, parallel),
+            perpendicular === 1 ? perpendicularProj : this.scale(perpendicularProj, perpendicular)
+        )
+    }
+
     scaling(...diagonal: vec.Vec<2>): Mat<2> {
+        return this.diagonal(...diagonal)
+    }
+
+    rotation(angle: number): Mat<2> {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
         return [
-            [diagonal[0], 0],
-            [0, diagonal[1]]
+            [+cos, +sin],
+            [-sin, +cos]
         ]
     }
 
@@ -498,6 +637,11 @@ export class Mat2Math implements MatMath<2> {
         ]
     }
 
+}
+
+export function coordinateSystem<D extends vec.Dim>(math: MatMath<D>, s: Mat<D>): (m: Mat<D>) => Mat<D> {
+    const invS = math.inverse(s)
+    return m => math.mul(s, math.mul(m, invS))
 }
 
 export const mat4 = new Mat4Math()

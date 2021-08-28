@@ -1,6 +1,6 @@
 import seedRandom from "seedrandom"
 import { Context, Suite } from "mocha"
-import { Dim, Mat, mat2, mat3, mat4, MatMath, Vec, vec2, vec3, vec4, VecMath } from "../../prod"
+import * as ether from "../../prod"
 import { expect } from "chai"
 import { fail } from "assert"
 
@@ -8,12 +8,12 @@ export type NumberGen = () => number
 
 export type MultiDimArray = number[] | MultiDimArray[]
 
-export class MathContext<D extends Dim> {
+export class MathContext<D extends ether.Dim, V extends ether.VecMath<D>, M extends ether.MatMath<D>> {
     
-    readonly vecGen: () => Vec<D>
-    readonly matGen: () => Mat<D>
+    readonly vecGen: () => ether.Vec<D>
+    readonly matGen: () => ether.Mat<D>
     
-    constructor(readonly gen: NumberGen, readonly vec: VecMath<D>, readonly mat: MatMath<D>) {
+    constructor(readonly gen: NumberGen, readonly vec: V, readonly mat: M) {
         this.vecGen = vec.gen(gen)
         this.matGen = mat.gen(this.vecGen)
     }
@@ -36,34 +36,42 @@ export class MathContext<D extends Dim> {
         }
     }
 
-    expectToBeParallel(v1: Vec<D>, v2: Vec<D>) {
+    expectToBeParallel(v1: ether.Vec<D>, v2: ether.Vec<D>) {
         expect(Math.abs(this.vec.dot(v1, v2))).to.be.closeTo(this.vec.length(v1) * this.vec.length(v2), EPSILON)
     }    
 
-    expectToBePerpendicular(v1: Vec<D>, v2: Vec<D>) {
+    expectToBePerpendicular(v1: ether.Vec<D>, v2: ether.Vec<D>) {
         expect(Math.abs(this.vec.dot(v1, v2))).to.be.closeTo(0, EPSILON)
     }    
 
-    expectToBeInSameDirection(v1: Vec<D>, v2: Vec<D>) {
+    expectToBeInSameDirection(v1: ether.Vec<D>, v2: ether.Vec<D>) {
         expect(this.vec.dot(v1, v2)).to.be.greaterThan(EPSILON)
     }    
 
-    expectToBeInOppositeDirection(v1: Vec<D>, v2: Vec<D>) {
+    expectToBeInOppositeDirection(v1: ether.Vec<D>, v2: ether.Vec<D>) {
         expect(this.vec.dot(v1, v2)).to.be.lessThan(-EPSILON)
-    }    
+    }
+
+    expectToBeOrthogonal(m: ether.Mat<D>) {
+        expect(this.mat.mul(m, this.mat.transpose(m))).to.satisfy(approximateEquality(this.mat.identity()))
+    }
 
 }
 
-export function math4(gen: NumberGen): MathContext<4> {
-    return new MathContext(gen, vec4, mat4)
+export type Math4Context = MathContext<4, ether.ImmutableVec4Math, ether.Mat4Math>
+export type Math3Context = MathContext<3, ether.ImmutableVec3Math, ether.Mat3Math>
+export type Math2Context = MathContext<2, ether.ImmutableVec2Math, ether.Mat2Math>
+
+export function math4(gen: NumberGen): Math4Context {
+    return new MathContext(gen, ether.vec4, ether.mat4)
 }
 
-export function math3(gen: NumberGen): MathContext<3> {
-    return new MathContext(gen, vec3, mat3)
+export function math3(gen: NumberGen): Math3Context {
+    return new MathContext(gen, ether.vec3, ether.mat3)
 }
 
-export function math2(gen: NumberGen): MathContext<2> {
-    return new MathContext(gen, vec2, mat2)
+export function math2(gen: NumberGen): Math2Context {
+    return new MathContext(gen, ether.vec2, ether.mat2)
 }
 
 export const EPSILON = Math.pow(2, -24)
@@ -89,13 +97,19 @@ export function approximateEquality(expected: MultiDimArray, epsilon: number = E
     }
 }
 
-export function forEachMath(f: { <D extends Dim>(mathContext: MathContext<D>): void }): (this: Context | Suite) => void {
+export function withMaths(f: (math4: Math4Context, math3: Math3Context, math2: Math2Context) => void): (this: Context | Suite) => void {
     return function() {
         const gen = numberGen(this)
-        f(new MathContext(gen, vec2, mat2))
-        f(new MathContext(gen, vec3, mat3))
-        f(new MathContext(gen, vec4, mat4))
+        f(math4(gen), math3(gen), math2(gen))
     }
+}
+
+export function forEachMath(f: { <D extends ether.Dim, V extends ether.VecMath<D>, M extends ether.MatMath<D>>(mathContext: MathContext<D, V, M>): void }): (this: Context | Suite) => void {
+    return withMaths((math4, math3, math2) => {
+        f(math2)
+        f(math3)
+        f(math4)
+    })
 }
 
 export function using(f: (gen: NumberGen) => void): (this: Context | Suite) => void {
