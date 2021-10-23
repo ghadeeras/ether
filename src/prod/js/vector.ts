@@ -1,5 +1,5 @@
 import { failure } from "./utils.js";
-import { Mat } from "./matrix.js";
+import { Mat, Mat2, Mat3, Mat4 } from "./matrix.js";
 
 export type Dim = 2 | 3 | 4
 
@@ -9,6 +9,7 @@ export type DimMap<D extends Dim, D2, D3, D4> =
     D extends 2 ? D2 : never
 
 export type LowerDim<D extends Dim> = DimMap<D, never, 2, 3>
+export type HigherDim<D extends Dim> = DimMap<D, 3, 4, never>
 
 export type Component<D extends Dim> = DimMap<D, (0 | 1), (0 | 1 | 2), (0 | 1 | 2 | 3)>
 
@@ -20,11 +21,19 @@ export type VecDim<V extends Vec<any>> = V["length"]
 
 export type SwizzleComponents<S extends Dim, D extends Dim> = Tuple<Component<S>, D>
 
+export type Vec2 = Vec<2>
+export type Vec3 = Vec<3>
+export type Vec4 = Vec<4>
+
+export type NumberArray = number[] | Float64Array | Float32Array | Int32Array | Int16Array | Int8Array | Uint32Array | Uint16Array | Uint8Array 
+
 export interface VecMath<D extends Dim> {
 
     of(...components: Vec<D>): Vec<D>
 
     gen(...components: [() => number] | Tuple<() => number, D>): () => Vec<D>
+
+    from(array: NumberArray, offset?: number): Vec<D>
 
     add(v1: Vec<D>, v2: Vec<D>): Vec<D>
 
@@ -58,6 +67,8 @@ export interface VecMath<D extends Dim> {
 
     length(v: Vec<D>): number
 
+    setLength(v: Vec<D>, l: number): Vec<D>
+
     unit(v: Vec<D>): Vec<D>
 
     mix(w: number, v1: Vec<D>, v2: Vec<D>): Vec<D>
@@ -83,6 +94,8 @@ abstract class VecMathBase<D extends Dim> implements VecMath<D> {
     protected abstract get mutable(): MutableVecMathBase<D>
 
     protected abstract get immutable(): ImmutableVecMathBase<D>
+
+    abstract from(array: NumberArray, offset?: number): Vec<D>
 
     abstract gen(...components: [() => number] | Tuple<() => number, D>): () => Vec<D>
     
@@ -128,8 +141,12 @@ abstract class VecMathBase<D extends Dim> implements VecMath<D> {
         return Math.sqrt(this.lengthSquared(v))
     }
     
+    setLength(v: Vec<D>, l: number): Vec<D> {
+        return this.scale(v, l / this.length(v))
+    }
+    
     unit(v: Vec<D>): Vec<D> {
-        return this.scale(v, 1 / this.length(v))
+        return this.setLength(v, 1)
     }
     
     mix(w: number, v1: Vec<D>, v2: Vec<D>): Vec<D> {
@@ -190,14 +207,18 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         return this
     }
 
-    gen(...components: [() => number] | Tuple<() => number, 4>): () => Vec<4> {
+    from(array: NumberArray, offset: number = 0): Vec4 {
+        return [array[offset + 0], array[offset + 1], array[offset + 2], array[offset + 3]] 
+    }
+
+    gen(...components: [() => number] | Tuple<() => number, 4>): () => Vec4 {
         const component = components[0]
         return components.length == 1 ?
             () => this.of(component(), component(), component(), component()) :
             () => this.of(components[0](), components[1](), components[2](), components[3]())
     }
 
-    add(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    add(v1: Vec4, v2: Vec4): Vec4 {
         return [
             v1[0] + v2[0],
             v1[1] + v2[1],
@@ -206,7 +227,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    sub(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    sub(v1: Vec4, v2: Vec4): Vec4 {
         return [
             v1[0] - v2[0],
             v1[1] - v2[1],
@@ -215,7 +236,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    mul(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    mul(v1: Vec4, v2: Vec4): Vec4 {
         return [
             v1[0] * v2[0],
             v1[1] * v2[1],
@@ -224,7 +245,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    div(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    div(v1: Vec4, v2: Vec4): Vec4 {
         return [
             v1[0] / v2[0],
             v1[1] / v2[1],
@@ -233,7 +254,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    scale(v: Vec<4>, f: number): Vec<4> {
+    scale(v: Vec4, f: number): Vec4 {
         return [
             v[0] * f,
             v[1] * f,
@@ -242,7 +263,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    max(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    max(v1: Vec4, v2: Vec4): Vec4 {
         return [
             Math.max(v1[0] , v2[0]),
             Math.max(v1[1] , v2[1]),
@@ -251,7 +272,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    min(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    min(v1: Vec4, v2: Vec4): Vec4 {
         return [
             Math.min(v1[0] , v2[0]),
             Math.min(v1[1] , v2[1]),
@@ -260,7 +281,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    neg(v: Vec<4>): Vec<4> {
+    neg(v: Vec4): Vec4 {
         return [
             -v[0],
             -v[1],
@@ -269,7 +290,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    swizzle<S extends Dim>(v: Vec<S>, ...components: SwizzleComponents<S, 4>): Vec<4> {
+    swizzle<S extends Dim>(v: Vec<S>, ...components: SwizzleComponents<S, 4>): Vec4 {
         return [
             v[components[0]] ?? failure(""),
             v[components[1]] ?? failure(""),
@@ -278,7 +299,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         ]
     }
     
-    dot(v1: Vec<4>, v2: Vec<4>): number {
+    dot(v1: Vec4, v2: Vec4): number {
         return (
             v1[0] * v2[0] +
             v1[1] * v2[1] +
@@ -287,7 +308,7 @@ export class ImmutableVec4Math extends ImmutableVecMathBase<4> {
         )
     }
     
-    prod(v: Vec<4>, m: Mat<4>): Vec<4> {
+    prod(v: Vec4, m: Mat4): Vec4 {
         return [
             this.dot(v, m[0]),
             this.dot(v, m[1]),
@@ -308,14 +329,18 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         return this
     }
 
-    gen(...components: [() => number] | Tuple<() => number, 3>): () => Vec<3> {
+    from(array: NumberArray, offset: number = 0): Vec3 {
+        return [array[offset + 0], array[offset + 1], array[offset + 2]] 
+    }
+
+    gen(...components: [() => number] | Tuple<() => number, 3>): () => Vec3 {
         const component = components[0]
         return components.length == 1 ?
             () => this.of(component(), component(), component()) :
             () => this.of(components[0](), components[1](), components[2]())
     }
 
-    add(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    add(v1: Vec3, v2: Vec3): Vec3 {
         return [
             v1[0] + v2[0],
             v1[1] + v2[1],
@@ -323,7 +348,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    sub(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    sub(v1: Vec3, v2: Vec3): Vec3 {
         return [
             v1[0] - v2[0],
             v1[1] - v2[1],
@@ -331,7 +356,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    mul(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    mul(v1: Vec3, v2: Vec3): Vec3 {
         return [
             v1[0] * v2[0],
             v1[1] * v2[1],
@@ -339,7 +364,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    div(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    div(v1: Vec3, v2: Vec3): Vec3 {
         return [
             v1[0] / v2[0],
             v1[1] / v2[1],
@@ -347,7 +372,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    scale(v: Vec<3>, f: number): Vec<3> {
+    scale(v: Vec3, f: number): Vec3 {
         return [
             v[0] * f,
             v[1] * f,
@@ -355,7 +380,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    max(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    max(v1: Vec3, v2: Vec3): Vec3 {
         return [
             Math.max(v1[0] , v2[0]),
             Math.max(v1[1] , v2[1]),
@@ -363,7 +388,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    min(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    min(v1: Vec3, v2: Vec3): Vec3 {
         return [
             Math.min(v1[0] , v2[0]),
             Math.min(v1[1] , v2[1]),
@@ -371,7 +396,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    neg(v: Vec<3>): Vec<3> {
+    neg(v: Vec3): Vec3 {
         return [
             -v[0],
             -v[1],
@@ -379,7 +404,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    swizzle<S extends Dim>(v: Vec<S>, ...components: SwizzleComponents<S, 3>): Vec<3> {
+    swizzle<S extends Dim>(v: Vec<S>, ...components: SwizzleComponents<S, 3>): Vec3 {
         return [
             v[components[0]] ?? failure(""),
             v[components[1]] ?? failure(""),
@@ -387,7 +412,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    dot(v1: Vec<3>, v2: Vec<3>): number {
+    dot(v1: Vec3, v2: Vec3): number {
         return (
             v1[0] * v2[0] +
             v1[1] * v2[1] +
@@ -395,7 +420,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         )
     }
     
-    cross(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    cross(v1: Vec3, v2: Vec3): Vec3 {
         return [
             v1[1]*v2[2] - v1[2]*v2[1],
             v1[2]*v2[0] - v1[0]*v2[2],
@@ -403,7 +428,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
     
-    prod(v: Vec<3>, m: Mat<3>): Vec<3> {
+    prod(v: Vec3, m: Mat3): Vec3 {
         return [
             this.dot(v, m[0]),
             this.dot(v, m[1]),
@@ -411,7 +436,7 @@ export class ImmutableVec3Math extends ImmutableVecMathBase<3> {
         ]
     }
 
-    equal(v1: Vec<3>, v2: Vec<3>, precision: number = 0.001) {
+    equal(v1: Vec3, v2: Vec3, precision: number = 0.001) {
         const cross = this.length(this.cross(v1, v2));
         const dot = this.dot(v1, v2);
         const tan = cross / dot;
@@ -430,98 +455,102 @@ export class ImmutableVec2Math extends ImmutableVecMathBase<2> {
         return this
     }
 
-    gen(...components: [() => number] | Tuple<() => number, 2>): () => Vec<2> {
+    from(array: NumberArray, offset: number = 0): Vec2 {
+        return [array[offset + 0], array[offset + 1]] 
+    }
+
+    gen(...components: [() => number] | Tuple<() => number, 2>): () => Vec2 {
         const component = components[0]
         return components.length == 1 ?
             () => this.of(component(), component()) :
             () => this.of(components[0](), components[1]())
     }
 
-    add(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    add(v1: Vec2, v2: Vec2): Vec2 {
         return [
             v1[0] + v2[0],
             v1[1] + v2[1]
         ]
     }
     
-    sub(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    sub(v1: Vec2, v2: Vec2): Vec2 {
         return [
             v1[0] - v2[0],
             v1[1] - v2[1]
         ]
     }
     
-    mul(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    mul(v1: Vec2, v2: Vec2): Vec2 {
         return [
             v1[0] * v2[0],
             v1[1] * v2[1]
         ]
     }
     
-    div(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    div(v1: Vec2, v2: Vec2): Vec2 {
         return [
             v1[0] / v2[0],
             v1[1] / v2[1]
         ]
     }
     
-    scale(v: Vec<2>, f: number): Vec<2> {
+    scale(v: Vec2, f: number): Vec2 {
         return [
             v[0] * f,
             v[1] * f
         ]
     }
     
-    max(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    max(v1: Vec2, v2: Vec2): Vec2 {
         return [
             Math.max(v1[0] , v2[0]),
             Math.max(v1[1] , v2[1])
         ]
     }
     
-    min(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    min(v1: Vec2, v2: Vec2): Vec2 {
         return [
             Math.min(v1[0] , v2[0]),
             Math.min(v1[1] , v2[1])
         ]
     }
     
-    neg(v: Vec<2>): Vec<2> {
+    neg(v: Vec2): Vec2 {
         return [
             -v[0],
             -v[1]
         ]
     }
     
-    swizzle<S extends Dim>(v: Vec<S>, ...components: SwizzleComponents<S, 2>): Vec<2> {
+    swizzle<S extends Dim>(v: Vec<S>, ...components: SwizzleComponents<S, 2>): Vec2 {
         return [
             v[components[0]] ?? failure(""),
             v[components[1]] ?? failure("")
         ]
     }
     
-    dot(v1: Vec<2>, v2: Vec<2>): number {
+    dot(v1: Vec2, v2: Vec2): number {
         return (
             v1[0] * v2[0] +
             v1[1] * v2[1]
         )
     }
     
-    prod(v: Vec<2>, m: Mat<2>): Vec<2> {
+    prod(v: Vec2, m: Mat2): Vec2 {
         return [
             this.dot(v, m[0]),
             this.dot(v, m[1])
         ]
     }
 
-    cross(v1: Vec<2>, v2: Vec<2>): number {
+    cross(v1: Vec2, v2: Vec2): number {
         return (
             v1[0] * v2[1] - 
             v1[1] * v2[0]
         )
     }
     
-    equal(v1: Vec<2>, v2: Vec<2>, precision: number = 0.001) {
+    equal(v1: Vec2, v2: Vec2, precision: number = 0.001) {
         const cross = this.cross(v1, v2);
         const dot = this.dot(v1, v2);
         const tan = cross / dot;
@@ -531,6 +560,10 @@ export class ImmutableVec2Math extends ImmutableVecMathBase<2> {
 }
 
 export abstract class MutableVecMathBase<D extends Dim> extends VecMathBase<D> {
+
+    from(array: NumberArray, offset: number = 0) {
+        return this.immutable.from(array, offset)
+    }
 
     addAll(v: Vec<D>, ...vs: Vec<D>[]): Vec<D> {
         for (const vn of vs) {
@@ -596,7 +629,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return vec4
     }
 
-    add(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    add(v1: Vec4, v2: Vec4): Vec4 {
         v1[0] += v2[0]
         v1[1] += v2[1]
         v1[2] += v2[2]
@@ -604,7 +637,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v1
     }
     
-    sub(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    sub(v1: Vec4, v2: Vec4): Vec4 {
         v1[0] -= v2[0]
         v1[1] -= v2[1]
         v1[2] -= v2[2]
@@ -612,7 +645,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v1
     }
     
-    mul(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    mul(v1: Vec4, v2: Vec4): Vec4 {
         v1[0] *= v2[0]
         v1[1] *= v2[1]
         v1[2] *= v2[2]
@@ -620,7 +653,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v1
     }
     
-    div(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    div(v1: Vec4, v2: Vec4): Vec4 {
         v1[0] /= v2[0]
         v1[1] /= v2[1]
         v1[2] /= v2[2]
@@ -628,7 +661,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v1
     }
     
-    scale(v: Vec<4>, f: number): Vec<4> {
+    scale(v: Vec4, f: number): Vec4 {
         v[0] *= f
         v[1] *= f
         v[2] *= f
@@ -636,7 +669,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v
     }
     
-    max(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    max(v1: Vec4, v2: Vec4): Vec4 {
         v1[0] = Math.max(v1[0] , v2[0])
         v1[1] = Math.max(v1[1] , v2[1])
         v1[2] = Math.max(v1[2] , v2[2])
@@ -644,7 +677,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v1
     }
     
-    min(v1: Vec<4>, v2: Vec<4>): Vec<4> {
+    min(v1: Vec4, v2: Vec4): Vec4 {
         v1[0] = Math.min(v1[0] , v2[0])
         v1[1] = Math.min(v1[1] , v2[1])
         v1[2] = Math.min(v1[2] , v2[2])
@@ -652,7 +685,7 @@ export class MutableVec4Math extends MutableVecMathBase<4> {
         return v1
     }
     
-    neg(v: Vec<4>): Vec<4> {
+    neg(v: Vec4): Vec4 {
         v[0] = -v[0]
         v[1] = -v[1]
         v[2] = -v[2]
@@ -673,56 +706,56 @@ export class MutableVec3Math extends MutableVecMathBase<3> {
     }
 
 
-    add(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    add(v1: Vec3, v2: Vec3): Vec3 {
         v1[0] += v2[0]
         v1[1] += v2[1]
         v1[2] += v2[2]
         return v1
     }
     
-    sub(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    sub(v1: Vec3, v2: Vec3): Vec3 {
         v1[0] -= v2[0]
         v1[1] -= v2[1]
         v1[2] -= v2[2]
         return v1
     }
     
-    mul(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    mul(v1: Vec3, v2: Vec3): Vec3 {
         v1[0] *= v2[0]
         v1[1] *= v2[1]
         v1[2] *= v2[2]
         return v1
     }
     
-    div(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    div(v1: Vec3, v2: Vec3): Vec3 {
         v1[0] /= v2[0]
         v1[1] /= v2[1]
         v1[2] /= v2[2]
         return v1
     }
     
-    scale(v: Vec<3>, f: number): Vec<3> {
+    scale(v: Vec3, f: number): Vec3 {
         v[0] *= f
         v[1] *= f
         v[2] *= f
         return v
     }
     
-    max(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    max(v1: Vec3, v2: Vec3): Vec3 {
         v1[0] = Math.max(v1[0] , v2[0])
         v1[1] = Math.max(v1[1] , v2[1])
         v1[2] = Math.max(v1[2] , v2[2])
         return v1
     }
     
-    min(v1: Vec<3>, v2: Vec<3>): Vec<3> {
+    min(v1: Vec3, v2: Vec3): Vec3 {
         v1[0] = Math.min(v1[0] , v2[0])
         v1[1] = Math.min(v1[1] , v2[1])
         v1[2] = Math.min(v1[2] , v2[2])
         return v1
     }
     
-    neg(v: Vec<3>): Vec<3> {
+    neg(v: Vec3): Vec3 {
         v[0] = -v[0]
         v[1] = -v[1]
         v[2] = -v[2]
@@ -741,49 +774,49 @@ export class MutableVec2Math extends MutableVecMathBase<2> {
         return vec2
     }
 
-    add(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    add(v1: Vec2, v2: Vec2): Vec2 {
         v1[0] += v2[0]
         v1[1] += v2[1]
         return v1
     }
     
-    sub(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    sub(v1: Vec2, v2: Vec2): Vec2 {
         v1[0] -= v2[0]
         v1[1] -= v2[1]
         return v1
     }
     
-    mul(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    mul(v1: Vec2, v2: Vec2): Vec2 {
         v1[0] *= v2[0]
         v1[1] *= v2[1]
         return v1
     }
     
-    div(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    div(v1: Vec2, v2: Vec2): Vec2 {
         v1[0] /= v2[0]
         v1[1] /= v2[1]
         return v1
     }
     
-    scale(v: Vec<2>, f: number): Vec<2> {
+    scale(v: Vec2, f: number): Vec2 {
         v[0] *= f
         v[1] *= f
         return v
     }
     
-    max(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    max(v1: Vec2, v2: Vec2): Vec2 {
         v1[0] = Math.max(v1[0] , v2[0])
         v1[1] = Math.max(v1[1] , v2[1])
         return v1
     }
     
-    min(v1: Vec<2>, v2: Vec<2>): Vec<2> {
+    min(v1: Vec2, v2: Vec2): Vec2 {
         v1[0] = Math.min(v1[0] , v2[0])
         v1[1] = Math.min(v1[1] , v2[1])
         return v1
     }
     
-    neg(v: Vec<2>): Vec<2> {
+    neg(v: Vec2): Vec2 {
         v[0] = -v[0]
         v[1] = -v[1]
         return v

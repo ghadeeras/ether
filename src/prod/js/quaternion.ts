@@ -1,9 +1,13 @@
-import { Mat } from "./matrix.js";
-import { Vec, vec3, vec4 } from "./vector.js";
+import { Mat3 } from "./matrix.js";
+import { vec3, vec4, Vec3, Vec4, NumberArray } from "./vector.js";
 
-export type Quat = Vec<4>
+export type Quat = Vec4
 
 export class QuatMath {
+
+    from(array: NumberArray, offset: number = 0): Quat {
+        return vec4.from(array, offset) 
+    }
 
     add(q1: Quat, q2: Quat): Quat {
         return vec4.add(q1, q2)
@@ -52,15 +56,15 @@ export class QuatMath {
         return vec4.length(q)
     }
 
-    rotation(angle: number, axis: Vec<3>, isNormalized: boolean = false): Quat {
+    rotation(angle: number, axis: Vec3, isNormalized: boolean = false): Quat {
         const a = angle / 2
         const unitAxis = isNormalized ? axis : vec3.unit(axis);
         return [...vec3.scale(unitAxis, Math.sin(a)), Math.cos(a)]
     }
 
-    transform(q: Quat, v: Vec<3>, isNormalized: boolean = false): Vec<3> {
+    transform(q: Quat, v: Vec3, isNormalized: boolean = false): Vec3 {
         const [qx, qy, qz, c] = isNormalized ? q : this.unit(q)
-        const sa: Vec<3> = [qx, qy, qz]
+        const sa: Vec3 = [qx, qy, qz]
         const ss = vec3.lengthSquared(sa)
         return vec3.addAll(
             vec3.scale(v, c * c - ss),
@@ -69,7 +73,7 @@ export class QuatMath {
         )
     }
 
-    toMatrix(q: Quat, isNormalized: boolean = false): Mat<3> {
+    toMatrix(q: Quat, isNormalized: boolean = false): Mat3 {
         const [x, y, z, w] = isNormalized ? q : this.unit(q)
         const xx = x * x
         const yy = y * y
