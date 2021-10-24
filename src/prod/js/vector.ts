@@ -1,4 +1,3 @@
-import { failure } from "./utils.js";
 import { Mat, Mat2, Mat3, Mat4 } from "./matrix.js";
 
 export type Dim = 2 | 3 | 4
@@ -841,4 +840,8 @@ export function deleteComponent<T, D extends Dim>(tuple: Tuple<T, D>, component:
         result[j] = tuple[i]
     }
     return result as Tuple<T, LowerDim<D>>
+}
+
+function failure<T>(message: string): T {
+    throw new Error(message)
 }
