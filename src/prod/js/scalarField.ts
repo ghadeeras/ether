@@ -7,6 +7,11 @@ export type ScalarFieldExports = {
     tessellateTetrahedron: (contourValue: number, point0: rt.Reference, point1: rt.Reference, point2: rt.Reference, point3: rt.Reference) => rt.Reference;
     tessellateCube: (contourValue: number, point0: rt.Reference, point1: rt.Reference, point2: rt.Reference, point3: rt.Reference, point4: rt.Reference, point5: rt.Reference, point6: rt.Reference, point7: rt.Reference) => rt.Reference;
     tesselateScalarField(fieldRef: rt.Reference, resolution: number, contourValue: number): rt.Reference;
+    sampleScalarField(resolution: number): rt.Reference;
+}
+
+export type SamplerExports = {
+    sampleAt: (x: number, y: number, z: number, result: rt.Reference) => void
 }
 
 export const modulePaths = {
@@ -58,8 +63,22 @@ class ScalarFieldModuleImpl implements ScalarFieldModule {
     }
 
     newInstance(): ScalarFieldInstance {
-        const instances = this.linker.link({})
+        const samplerProxy: SamplerExports = {
+            sampleAt: () => {
+                throw new Error("Unimplemented!")
+            }
+        }
+        const instances = this.linker.link({
+            sampler: {
+                exports: {
+                    sampleAt: function(x: number, y: number, z: number, result: rt.Reference) {
+                        samplerProxy.sampleAt(x, y, z, result)
+                    }
+                }
+            }
+        })
         return new ScalarFieldInstanceImpl(
+            samplerProxy,
             instances.mem.exports as rt.MemExports, 
             instances.space.exports as rt.SpaceExports, 
             instances.scalarField.exports as ScalarFieldExports
@@ -80,9 +99,9 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
 
     private _contourValue: number = 0
     private _resolution: number = 1
-    private _sampler: ScalarFieldSampler = (x, y, z) => vec4.of(x, y, z, (x*x + y*y + z*z) / 2)
+    private _sampler: ScalarFieldSampler = (x, y, z) => vec4.of(x, y, z, (x * x + y * y + z * z) / 2) 
 
-    constructor(readonly mem: rt.MemExports, readonly space: rt.SpaceExports, readonly scalarField: ScalarFieldExports) {
+    constructor(private samplerProxy: SamplerExports, readonly mem: rt.MemExports, readonly space: rt.SpaceExports, readonly scalarField: ScalarFieldExports) {
         this.mem.enter()
         this.mem.enter()
         this.invalidateSampling()
@@ -103,6 +122,9 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
 
     set sampler(s: ScalarFieldSampler) {
         this._sampler = s
+        this.samplerProxy.sampleAt = (x, y, z, result) => {
+            this.space.f64_vec4_r(...s(x, y, z), result)
+        }
         this.invalidateSampling()
     }
 
@@ -224,27 +246,9 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
             return
         }
         this.mem.enter()
-        this.length = ((this._resolution + 1) ** 3) * 2 * 4
-        this.fieldRef = this.mem.allocate64(this.length)
-        const viewF64 = new Float64Array(this.mem.stack.buffer)
-        let i = this.fieldRef / Float64Array.BYTES_PER_ELEMENT
-        for (let z = 0; z <= this._resolution; z++) {
-            for (let y = 0; y <= this._resolution; y++) {
-                for (let x = 0; x <= this._resolution; x++) {
-                    const pos = vec4.of(this.normalize(x), this.normalize(y), this.normalize(z), 1)
-                    const field = this._sampler(...pos)
-                    viewF64.set(pos, i)
-                    i += pos.length
-                    viewF64.set(field, i)
-                    i += field.length
-                }
-            }
-        }
+        this.fieldRef = this.scalarField.sampleScalarField(this._resolution)
+        this.length = (this.mem.allocate64(0) - this.fieldRef) / Float64Array.BYTES_PER_ELEMENT
         this.samplingDirty = false
-    }
-
-    private normalize(x: number): number {
-        return 2 * (x / this._resolution) - 1
     }
 
     private denormalize(x: number): number {

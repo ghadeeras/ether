@@ -4,9 +4,13 @@
     (import "mem" "enter" (func $enter))
     (import "mem" "leave" (func $leave))
     (import "mem" "allocate32" (func $allocate32 (param i32) (result i32)))
+    (import "mem" "allocate64" (func $allocate64 (param i32) (result i32)))
 
+    (import "space" "f64_vec4_r" (func $vec4 (param $x f64) (param $y f64) (param $z f64) (param $w f64) (param $result i32) (result i32)))
     (import "space" "f64_vec3_add" (func $vec3Add (param $v1 i32) (param $v2 i32) (result i32)))
     (import "space" "f64_vec3_scalar_mul" (func $vec3Scale (param $v i32) (param $factor f64) (result i32)))
+
+    (import "sampler" "sampleAt" (func $sampleAt (param $x f64) (param $y f64) (param $z f64) (param $result i32)))
 
     (func $f64_vec3_demote_copy (param $src i32) (param $dst i32) (result i32)
         (f32.store offset=0 (local.get $dst) (f32.demote_f64 (f64.load offset=0 (local.get $src))))
@@ -22,6 +26,79 @@
         (f32.store offset=4 (local.get $result) (f32.load offset=4 (local.get $v)))
         (f32.store offset=8 (local.get $result) (f32.load offset=8 (local.get $v)))
         (local.get $result)
+    )
+
+    (func $sampleScalarField (param $resolution i32) (result i32)
+        (local $index i32)
+        (local $max i32)
+        (local $size i32)
+        (local $xi i32)
+        (local $yi i32)
+        (local $zi i32)
+        (local $xf f64)
+        (local $yf f64)
+        (local $zf f64)
+
+        (local.set $size (local.tee $max (i32.add (local.get $resolution) (i32.const 1))))
+        (local.set $size (i32.mul (local.get $size) (local.get $max)))
+        (local.set $size (i32.mul (local.get $size) (local.get $max)))
+        (local.set $size (i32.mul (local.get $size) (i32.const 8)))
+
+        (local.tee $index (call $allocate64 (local.get $size)))
+
+        (local.set $zi (i32.const 0))
+        (loop $nextZ
+            (local.set $zf (call $normalize (local.get $zi) (local.get $resolution)))
+
+            (local.set $yi (i32.const 0))
+            (loop $nextY
+                (local.set $yf (call $normalize (local.get $yi) (local.get $resolution)))
+
+                (local.set $xi (i32.const 0))
+                (loop $nextX
+                    (local.set $xf (call $normalize (local.get $xi) (local.get $resolution)))
+                    
+                    (drop (call $vec4
+                        (local.get $xf)
+                        (local.get $yf)
+                        (local.get $zf)
+                        (f64.const 1)
+                        (local.get $index)
+                    ))
+                    (local.set $index (i32.add (local.get $index) (i32.const 32)))
+                    
+                    (call $sampleAt
+                        (local.get $xf)
+                        (local.get $yf)
+                        (local.get $zf)
+                        (local.get $index)
+                    )
+                    (local.set $index (i32.add (local.get $index) (i32.const 32)))
+
+                    (local.set $xi (i32.add (local.get $xi) (i32.const 1)))
+                    (br_if $nextX (i32.le_u (local.get $xi) (local.get $resolution)))
+                )
+
+                (local.set $yi (i32.add (local.get $yi) (i32.const 1)))
+                (br_if $nextY (i32.le_u (local.get $yi) (local.get $resolution)))
+            )
+
+            (local.set $zi (i32.add (local.get $zi) (i32.const 1)))
+            (br_if $nextZ (i32.le_u (local.get $zi) (local.get $resolution)))
+        )
+    )
+
+    (func $normalize (param $i i32) (param $resolution i32) (result f64)
+        (f64.div 
+            (f64.convert_i32_s (i32.sub 
+                (i32.shl 
+                    (local.get $i) 
+                    (i32.const 1)
+                )
+                (local.get $resolution)
+            ))
+            (f64.convert_i32_u (local.get $resolution))
+        )
     )
 
     (func $tesselateScalarField (param $fieldRef i32) (param $resolution i32) (param $contourValue f64) (result i32)
@@ -377,6 +454,7 @@
         (i32.or)
     )
 
+    (export "sampleScalarField" (func $sampleScalarField))
     (export "tessellateTetrahedron" (func $tessellateTetrahedron))
     (export "tessellateCube" (func $tessellateCube))
     (export "tesselateScalarField" (func $tesselateScalarField))
