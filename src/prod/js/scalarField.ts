@@ -8,6 +8,8 @@ export type ScalarFieldExports = {
     tessellateCube: (contourValue: number, point0: rt.Reference, point1: rt.Reference, point2: rt.Reference, point3: rt.Reference, point4: rt.Reference, point5: rt.Reference, point6: rt.Reference, point7: rt.Reference) => rt.Reference;
     tesselateScalarField(fieldRef: rt.Reference, resolution: number, contourValue: number): rt.Reference;
     sampleScalarField(resolution: number): rt.Reference;
+    resampleScalarField(fieldRef: rt.Reference, resolution: number): void;
+    interpolatedSampleAt(fieldRef: rt.Reference, resolution: number, x: number, y: number, z:number): rt.Reference
 }
 
 export type SamplerExports = {
@@ -25,6 +27,10 @@ export type ScalarFieldModules = wa.WebAssemblyModules<ScalarFieldModuleNames>
 
 export async function loadScalarFieldModule(): Promise<ScalarFieldModule> {
     const modules = await wa.webLoadModules("", modulePaths)
+    return scalarFieldModule(modules)
+}
+
+export function scalarFieldModule(modules: ScalarFieldModules): ScalarFieldModule {
     return new ScalarFieldModuleImpl(modules)
 }
 
@@ -90,8 +96,8 @@ class ScalarFieldModuleImpl implements ScalarFieldModule {
 class ScalarFieldInstanceImpl implements ScalarFieldInstance {
 
     private fieldRef: number = 0
-    private length: number = 0
     
+    private resolutionDirty: boolean = false
     private samplingDirty: boolean = false
     private verticesDirty: boolean = false
 
@@ -99,12 +105,23 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
 
     private _contourValue: number = 0
     private _resolution: number = 1
-    private _sampler: ScalarFieldSampler = (x, y, z) => vec4.of(x, y, z, (x * x + y * y + z * z) / 2) 
+    private _sampler: ScalarFieldSampler = (x, y, z) => vec4.of(x, y, z, (x * x + y * y + z * z) / 2)
+
+    private _lastMemSize: number = 0
+    private _view64: Float64Array = new Float64Array()
 
     constructor(private samplerProxy: SamplerExports, readonly mem: rt.MemExports, readonly space: rt.SpaceExports, readonly scalarField: ScalarFieldExports) {
         this.mem.enter()
         this.mem.enter()
-        this.invalidateSampling()
+        this.invalidateResolution()
+    }
+
+    get view64(): Float64Array {
+        if (this._lastMemSize != this.mem.stack.buffer.byteLength) {
+            this._lastMemSize = this.mem.stack.buffer.byteLength
+            this._view64 = new Float64Array(this.mem.stack.buffer)
+        }
+        return this._view64
     }
     
     get resolution(): number {
@@ -113,7 +130,7 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
 
     set resolution(r: number) {
         this._resolution = r
-        this.invalidateSampling()
+        this.invalidateResolution()
     }
 
     get sampler(): ScalarFieldSampler {
@@ -123,7 +140,8 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
     set sampler(s: ScalarFieldSampler) {
         this._sampler = s
         this.samplerProxy.sampleAt = (x, y, z, result) => {
-            this.space.f64_vec4_r(...s(x, y, z), result)
+            const vec = s(x, y, z)
+            this.space.f64_vec4_r(...vec, result)
         }
         this.invalidateSampling()
     }
@@ -143,70 +161,24 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
     }
 
     get(x: number, y: number, z: number): Vec4 {
-        x = this.denormalize(x)
-        y = this.denormalize(y)
-        z = this.denormalize(z)
-
-        const x0 = Math.floor(x)
-        const dx0 = x - x0
-        const x1 = Math.ceil(x)
-        const dx1 = x1 - x
-
-        const y0 = Math.floor(y)
-        const dy0 = y - y0
-        const y1 = Math.ceil(y)
-        const dy1 = y1 - y
-
-        const z0 = Math.floor(z)
-        const dz0 = z - z0
-        const z1 = Math.ceil(z)
-        const dz1 = z1 - z
-
-        const dx0dy0 = dx0 * dy0
-        const dx0dy1 = dx0 * dy1
-        const dx1dy0 = dx1 * dy0
-        const dx1dy1 = dx1 * dy1
-
-        const w000 = 1 - dx0dy0 * dz0
-        const w001 = 1 - dx0dy0 * dz1
-        const w010 = 1 - dx0dy1 * dz0
-        const w011 = 1 - dx0dy1 * dz1
-        const w100 = 1 - dx1dy0 * dz0
-        const w101 = 1 - dx1dy0 * dz1
-        const w110 = 1 - dx1dy1 * dz0
-        const w111 = 1 - dx1dy1 * dz1
-        const w = w000 + w001 + w010 + w011 + w100 + w101 + w110 + w111
-
-        const r = (this._resolution + 1)
-
-        const r100 = 8
-        const r010 = r * r100
-        const r001 = r * r010
-
-        const r011 = r010 + r001
-        const r101 = r100 + r001
-        const r110 = r100 + r010
-
-        const r000 = 0
-        const r111 = r101 + r010
-
-        const offset = (z0 * r + y0) * r + x0 + 4
-
-        const field = new Float64Array(this.mem.stack.buffer, this.fieldRef, this.length)
-        return vec4.addAll(
-            vec4.scale(this.getSample(field, offset + r000), w000 / w),
-            vec4.scale(this.getSample(field, offset + r001), w001 / w),
-            vec4.scale(this.getSample(field, offset + r010), w010 / w),
-            vec4.scale(this.getSample(field, offset + r011), w011 / w),
-            vec4.scale(this.getSample(field, offset + r100), w100 / w),
-            vec4.scale(this.getSample(field, offset + r101), w101 / w),
-            vec4.scale(this.getSample(field, offset + r110), w110 / w),
-            vec4.scale(this.getSample(field, offset + r111), w111 / w),
-        )
+        this.doSample()
+        const v = this.view64
+        this.mem.enter()
+        const i = this.scalarField.interpolatedSampleAt(this.fieldRef, this.resolution, x, y, z) / v.BYTES_PER_ELEMENT
+        const result = vec4.of(v[i], v[i + 1], v[i + 2], v[i + 3])
+        this.mem.leave()
+        return result
     }
 
-    private getSample(field: Float64Array, offset: number) {
-        return vec4.of(field[offset], field[offset + 1], field[offset + 2], field[offset + 3])
+    private invalidateResolution() {
+        if (this.resolutionDirty) {
+            return
+        }
+
+        this.invalidateSampling()
+
+        this.mem.leave()
+        this.resolutionDirty = true
     }
 
     private invalidateSampling() {
@@ -216,7 +188,6 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
 
         this.invalidateVertices()
 
-        this.mem.leave()
         this.samplingDirty = true
     }
 
@@ -245,22 +216,14 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
         if (!this.samplingDirty) {
             return
         }
-        this.mem.enter()
-        this.fieldRef = this.scalarField.sampleScalarField(this._resolution)
-        this.length = (this.mem.allocate64(0) - this.fieldRef) / Float64Array.BYTES_PER_ELEMENT
+        if (this.resolutionDirty) {
+            this.mem.enter()
+            this.fieldRef = this.scalarField.sampleScalarField(this._resolution)
+            this.resolutionDirty = false
+        } else {
+            this.scalarField.resampleScalarField(this.fieldRef, this._resolution)
+        }
         this.samplingDirty = false
-    }
-
-    private denormalize(x: number): number {
-        return this._resolution * (this.wrap(x) + 1) / 2
-    }
-
-    private wrap(x: number) {
-        return x > 1 ?
-            x % 1 - 1 :
-            x < -1 ?
-                x % 1 + 1 :
-                x
     }
 
 } 

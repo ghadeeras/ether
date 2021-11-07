@@ -6,7 +6,11 @@
     (import "mem" "allocate32" (func $allocate32 (param i32) (result i32)))
     (import "mem" "allocate64" (func $allocate64 (param i32) (result i32)))
 
-    (import "space" "f64_vec4_r" (func $vec4 (param $x f64) (param $y f64) (param $z f64) (param $w f64) (param $result i32) (result i32)))
+    (import "space" "f64_vec4" (func $vec4 (param $x f64) (param $y f64) (param $z f64) (param $w f64) (result i32)))
+    (import "space" "f64_vec4_r" (func $vec4_r (param $x f64) (param $y f64) (param $z f64) (param $w f64) (param $result i32) (result i32)))
+    (import "space" "f64_vec4_add_r" (func $vec4_add_r (param $v1 i32) (param $v2 i32) (param $result i32) (result i32)))
+    (import "space" "f64_vec4_scalar_mul_r" (func $vec4_scale_r (param $v i32) (param $factor f64) (param $result i32) (result i32)))
+    
     (import "space" "f64_vec3_add" (func $vec3Add (param $v1 i32) (param $v2 i32) (result i32)))
     (import "space" "f64_vec3_scalar_mul" (func $vec3Scale (param $v i32) (param $factor f64) (result i32)))
 
@@ -58,7 +62,7 @@
                 (loop $nextX
                     (local.set $xf (call $normalize (local.get $xi) (local.get $resolution)))
                     
-                    (drop (call $vec4
+                    (drop (call $vec4_r
                         (local.get $xf)
                         (local.get $yf)
                         (local.get $zf)
@@ -88,6 +92,50 @@
         )
     )
 
+    (func $resampleScalarField (param $fieldRef i32) (param $resolution i32)
+        (local $index i32)
+        (local $xi i32)
+        (local $yi i32)
+        (local $zi i32)
+        (local $xf f64)
+        (local $yf f64)
+        (local $zf f64)
+
+        (local.set $index (i32.add (local.get $fieldRef) (i32.const 32)))
+
+        (local.set $zi (i32.const 0))
+        (loop $nextZ
+            (local.set $zf (call $normalize (local.get $zi) (local.get $resolution)))
+
+            (local.set $yi (i32.const 0))
+            (loop $nextY
+                (local.set $yf (call $normalize (local.get $yi) (local.get $resolution)))
+
+                (local.set $xi (i32.const 0))
+                (loop $nextX
+                    (local.set $xf (call $normalize (local.get $xi) (local.get $resolution)))
+                    
+                    (call $sampleAt
+                        (local.get $xf)
+                        (local.get $yf)
+                        (local.get $zf)
+                        (local.get $index)
+                    )
+                    (local.set $index (i32.add (local.get $index) (i32.const 64)))
+
+                    (local.set $xi (i32.add (local.get $xi) (i32.const 1)))
+                    (br_if $nextX (i32.le_u (local.get $xi) (local.get $resolution)))
+                )
+
+                (local.set $yi (i32.add (local.get $yi) (i32.const 1)))
+                (br_if $nextY (i32.le_u (local.get $yi) (local.get $resolution)))
+            )
+
+            (local.set $zi (i32.add (local.get $zi) (i32.const 1)))
+            (br_if $nextZ (i32.le_u (local.get $zi) (local.get $resolution)))
+        )
+    )
+
     (func $normalize (param $i i32) (param $resolution i32) (result f64)
         (f64.div 
             (f64.convert_i32_s (i32.sub 
@@ -97,6 +145,160 @@
                 )
                 (local.get $resolution)
             ))
+            (f64.convert_i32_u (local.get $resolution))
+        )
+    )
+
+    (func $interpolatedSampleAt (param $fieldRef i32) (param $resolution i32) (param $x f64) (param $y f64) (param $z f64) (result i32)
+        ;; Denormalized coordinates
+        (local $xx f64)
+        (local $yy f64)
+        (local $zz f64)
+
+        ;; Floors of denormalized coordinates
+        (local $xf f64)
+        (local $yf f64)
+        (local $zf f64)
+
+        ;; Denormalized coordinates converted to integers
+        (local $xi i32)
+        (local $yi i32)
+        (local $zi i32)
+
+        ;; Deltas between denormalized coordinates and their floors/cielings
+        (local $dxf f64)
+        (local $dyf f64)
+        (local $dzf f64)
+        (local $dxc f64)
+        (local $dyc f64)
+        (local $dzc f64)
+
+        ;; Weights for cube edges parallel to x axis
+        (local $w00 f64) 
+        (local $w01 f64) 
+        (local $w10 f64) 
+        (local $w11 f64) 
+
+        ;; Weights for each corner of the cube
+        (local $w000 f64) 
+        (local $w001 f64) 
+        (local $w010 f64) 
+        (local $w011 f64) 
+        (local $w100 f64) 
+        (local $w101 f64) 
+        (local $w110 f64) 
+        (local $w111 f64)
+
+        ;; Offsets for the addresses of each corner of the cube
+        (local $delta001 i32) 
+        (local $delta010 i32) 
+        (local $delta011 i32) 
+        (local $delta100 i32) 
+        (local $delta101 i32) 
+        (local $delta110 i32) 
+        (local $delta111 i32)
+
+        (local $point000 i32)
+        (local $result i32)
+        (local $op i32)
+
+        (local.set $xi (i32.trunc_f64_s (local.tee $xf (f64.floor (local.tee $xx (call $denormalize (local.get $x) (local.get $resolution)))))))
+        (local.set $yi (i32.trunc_f64_s (local.tee $yf (f64.floor (local.tee $yy (call $denormalize (local.get $y) (local.get $resolution)))))))
+        (local.set $zi (i32.trunc_f64_s (local.tee $zf (f64.floor (local.tee $zz (call $denormalize (local.get $z) (local.get $resolution)))))))
+
+        (local.set $result (call $vec4 (f64.const 0.0) (f64.const 0.0) (f64.const 0.0) (f64.const 0.0)))
+        (if (i32.lt_s (local.get $xi) (i32.const 0))
+            (return (local.get $result))
+        )
+        (if (i32.gt_s (local.get $xi) (local.get $resolution))
+            (return (local.get $result))
+        )
+        (if (i32.lt_s (local.get $yi) (i32.const 0))
+            (return (local.get $result))
+        )
+        (if (i32.gt_s (local.get $yi) (local.get $resolution))
+            (return (local.get $result))
+        )
+        (if (i32.lt_s (local.get $zi) (i32.const 0))
+            (return (local.get $result))
+        )
+        (if (i32.gt_s (local.get $zi) (local.get $resolution))
+            (return (local.get $result))
+        )
+
+        (local.set $dxc (f64.sub (f64.const 1.0) (local.tee $dxf (f64.sub (local.get $xx) (local.get $xf)))))
+        (local.set $dyc (f64.sub (f64.const 1.0) (local.tee $dyf (f64.sub (local.get $yy) (local.get $yf)))))
+        (local.set $dzc (f64.sub (f64.const 1.0) (local.tee $dzf (f64.sub (local.get $zz) (local.get $zf)))))
+
+        (local.set $w00 (f64.mul (local.get $dyc) (local.get $dzc)))
+        (local.set $w01 (f64.mul (local.get $dyc) (local.get $dzf)))
+        (local.set $w10 (f64.mul (local.get $dyf) (local.get $dzc)))
+        (local.set $w11 (f64.mul (local.get $dyf) (local.get $dzf)))
+
+        (local.set $w000 (f64.mul (local.get $dxc) (local.get $w00))) 
+        (local.set $w001 (f64.mul (local.get $dxc) (local.get $w01)))
+        (local.set $w010 (f64.mul (local.get $dxc) (local.get $w10))) 
+        (local.set $w011 (f64.mul (local.get $dxc) (local.get $w11))) 
+        (local.set $w100 (f64.mul (local.get $dxf) (local.get $w00))) 
+        (local.set $w101 (f64.mul (local.get $dxf) (local.get $w01))) 
+        (local.set $w110 (f64.mul (local.get $dxf) (local.get $w10))) 
+        (local.set $w111 (f64.mul (local.get $dxf) (local.get $w11))) 
+
+        (local.set $delta100 (i32.const 64)) 
+        (local.set $delta010 (i32.mul (local.get $delta100) (i32.add (local.get $resolution) (i32.const 1)))) 
+        (local.set $delta001 (i32.mul (local.get $delta010) (i32.add (local.get $resolution) (i32.const 1))))
+        (local.set $delta011 (i32.add (local.get $delta010) (local.get $delta001))) 
+        (local.set $delta101 (i32.add (local.get $delta100) (local.get $delta001))) 
+        (local.set $delta110 (i32.add (local.get $delta100) (local.get $delta010))) 
+        (local.set $delta111 (i32.add (local.get $delta101) (local.get $delta010)))
+
+        (local.get $fieldRef)
+        (i32.const 32) ;; Skip over position vector to point to gradient vector
+        (i32.mul (local.get $xi) (local.get $delta100))
+        (i32.mul (local.get $yi) (local.get $delta010))
+        (i32.mul (local.get $zi) (local.get $delta001))
+        (i32.add)
+        (i32.add)
+        (i32.add)
+        (i32.add)
+        (local.set $point000)
+
+        (call $enter)
+        (local.set $op (call $allocate64 (i32.const 4)))
+
+        (drop (call $vec4_scale_r (local.get $point000) (local.get $w000) (local.get $result)))
+        
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta001)) (local.get $w001) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta010)) (local.get $w010) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta011)) (local.get $w011) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta100)) (local.get $w100) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta101)) (local.get $w101) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta110)) (local.get $w110) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (drop (call $vec4_scale_r (i32.add (local.get $point000) (local.get $delta111)) (local.get $w111) (local.get $op)))
+        (drop (call $vec4_add_r (local.get $result) (local.get $op) (local.get $result)))
+
+        (call $leave)
+         (local.get $result)
+    )
+
+    (func $denormalize (param $s f64) (param $resolution i32) (result f64)
+        (f64.mul
+            (f64.mul
+                (f64.add (local.get $s) (f64.const 1.0))
+                (f64.const 0.5)
+            )
             (f64.convert_i32_u (local.get $resolution))
         )
     )
@@ -455,6 +657,8 @@
     )
 
     (export "sampleScalarField" (func $sampleScalarField))
+    (export "resampleScalarField" (func $resampleScalarField))
+    (export "interpolatedSampleAt" (func $interpolatedSampleAt))
     (export "tessellateTetrahedron" (func $tessellateTetrahedron))
     (export "tessellateCube" (func $tessellateCube))
     (export "tesselateScalarField" (func $tesselateScalarField))
