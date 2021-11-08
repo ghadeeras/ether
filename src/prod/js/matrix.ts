@@ -8,7 +8,7 @@ export type Mat4 = Mat<4>
 
 export interface MatMath<D extends vec.Dim> {
 
-    from(array: vec.NumberArray): Mat<D>
+    from(array: vec.NumberArray, offset?: number): Mat<D>
 
     gen(...columns: [() => vec.Vec<D>] | vec.Tuple<() => vec.Vec<D>, D>): () => Mat<D>
 
@@ -44,12 +44,12 @@ export interface MatMath<D extends vec.Dim> {
 
 export class Mat4Math implements MatMath<4> {
 
-    from(array: vec.NumberArray): Mat4 {
+    from(array: vec.NumberArray, offset: number = 0): Mat4 {
         return [
-            vec.vec4.from(array,  0),
-            vec.vec4.from(array,  4),
-            vec.vec4.from(array,  8),
-            vec.vec4.from(array, 12),
+            vec.vec4.from(array, offset),
+            vec.vec4.from(array, offset + 4),
+            vec.vec4.from(array, offset + 8),
+            vec.vec4.from(array, offset + 12),
         ]
     }
 
@@ -312,11 +312,11 @@ export class Mat4Math implements MatMath<4> {
 
 export class Mat3Math implements MatMath<3> {
 
-    from(array: vec.NumberArray): Mat3 {
+    from(array: vec.NumberArray, offset = 0): Mat3 {
         return [
-            vec.vec3.from(array, 0),
-            vec.vec3.from(array, 4),
-            vec.vec3.from(array, 8),
+            vec.vec3.from(array, offset),
+            vec.vec3.from(array, offset + 3),
+            vec.vec3.from(array, offset + 6),
         ]
     }
 
@@ -536,10 +536,10 @@ export class Mat3Math implements MatMath<3> {
 
 export class Mat2Math implements MatMath<2> {
 
-    from(array: vec.NumberArray): Mat2 {
+    from(array: vec.NumberArray, offset = 0): Mat2 {
         return [
-            vec.vec2.from(array, 0),
-            vec.vec2.from(array, 4),
+            vec.vec2.from(array, offset),
+            vec.vec2.from(array, offset + 2),
         ]
     }
 

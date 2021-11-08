@@ -9,7 +9,8 @@ export type ScalarFieldExports = {
     tesselateScalarField(fieldRef: rt.Reference, resolution: number, contourValue: number): rt.Reference;
     sampleScalarField(resolution: number): rt.Reference;
     resampleScalarField(fieldRef: rt.Reference, resolution: number): void;
-    interpolatedSampleAt(fieldRef: rt.Reference, resolution: number, x: number, y: number, z:number): rt.Reference
+    interpolatedSample(fieldRef: rt.Reference, resolution: number, x: number, y: number, z:number): rt.Reference
+    nearestSample(fieldRef: rt.Reference, resolution: number, x: number, y: number, z:number): rt.Reference
 }
 
 export type SamplerExports = {
@@ -57,6 +58,7 @@ export interface ScalarFieldInstance {
     contourValue: number
 
     get(x: number, y: number, z: number): Vec4
+    getNearest(x: number, y: number, z: number): Vec4
 
 }
 
@@ -164,7 +166,17 @@ class ScalarFieldInstanceImpl implements ScalarFieldInstance {
         this.doSample()
         const v = this.view64
         this.mem.enter()
-        const i = this.scalarField.interpolatedSampleAt(this.fieldRef, this.resolution, x, y, z) / v.BYTES_PER_ELEMENT
+        const i = this.scalarField.interpolatedSample(this.fieldRef, this.resolution, x, y, z) / v.BYTES_PER_ELEMENT
+        const result = vec4.of(v[i], v[i + 1], v[i + 2], v[i + 3])
+        this.mem.leave()
+        return result
+    }
+
+    getNearest(x: number, y: number, z: number): Vec4 {
+        this.doSample()
+        const v = this.view64
+        this.mem.enter()
+        const i = this.scalarField.nearestSample(this.fieldRef, this.resolution, x, y, z) / v.BYTES_PER_ELEMENT
         const result = vec4.of(v[i], v[i + 1], v[i + 2], v[i + 3])
         this.mem.leave()
         return result

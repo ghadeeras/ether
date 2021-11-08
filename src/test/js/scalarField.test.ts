@@ -46,8 +46,44 @@ describe("ScalarField", () => {
         })
     
         it("returns zero for out of bounds coordinates", () => {
-            const vec1 = instance.get(-1.1, -1.1, -1.1)
-            const vec2 = instance.get(+1.1, +1.1, +1.1)
+            const vec1 = instance.get(-1.01, -1.01, -1.01)
+            const vec2 = instance.get(+1.01, +1.01, +1.01)
+            const zero = ether.vec4.of(0, 0, 0, 0)
+            expect(vec1).to.deep.equal(zero)
+            expect(vec2).to.deep.equal(zero)
+        })
+
+    })
+
+    describe("getNearest", () => {
+        
+        it("gets nearest samples", () => {
+            const vec1 = instance.getNearest(0.14, 0.25, 0.36)
+            const vec2 = instance.getNearest(0.15, 0.26, 0.34)
+            const expectedVec1 = samples[14][12][11]
+            const expectedVec2 = samples[13][13][12]
+            expect(vec1).to.satisfy(approximateEquality(expectedVec1))
+            expect(vec2).to.satisfy(approximateEquality(expectedVec2))
+        })
+    
+        it("returns exact same samples", () => {
+            const vec = instance.getNearest(-0.3, -0.2, -0.1)
+            const expectedVec = samples[9][8][7]
+            expect(vec).to.deep.equal(expectedVec)
+        })
+    
+        it("handles bounds properly", () => {
+            const vec1 = instance.getNearest(-1.04, -1.04, -1.04)
+            const vec2 = instance.getNearest(+1.04, +1.04, +1.04)
+            const expectedVec1 = samples[0][0][0]
+            const expectedVec2 = samples[resolution][resolution][resolution]
+            expect(vec1).to.deep.equal(expectedVec1)
+            expect(vec2).to.deep.equal(expectedVec2)
+        })
+    
+        it("returns zero for out of bounds coordinates", () => {
+            const vec1 = instance.getNearest(-1.1, -1.1, -1.1)
+            const vec2 = instance.getNearest(+1.1, +1.1, +1.1)
             const zero = ether.vec4.of(0, 0, 0, 0)
             expect(vec1).to.deep.equal(zero)
             expect(vec2).to.deep.equal(zero)
