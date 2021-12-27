@@ -20,7 +20,7 @@ export type SamplerExports = {
 export const modulePaths = {
     mem: "vibrato.js/latest/wa/mem.wasm",
     space: "vibrato.js/latest/wa/space.wasm",
-    scalarField: "ether/latest/wa/scalarField.wasm",
+    scalarField: "aether/latest/wa/scalarField.wasm",
 }
 
 export type ScalarFieldModuleNames = keyof typeof modulePaths

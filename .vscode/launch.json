@@ -11,7 +11,7 @@
                 "--require", "esm",
                 "--timeout", "120000000",
                 // "--fgrep", ">>>",
-                "\"${workspaceFolder}/root/ether/test/js/**/*.test.js\"",
+                "\"${workspaceFolder}/root/aether/test/js/**/*.test.js\"",
             ],
             "console": "integratedTerminal",
             "preLaunchTask": "tsc: build"
