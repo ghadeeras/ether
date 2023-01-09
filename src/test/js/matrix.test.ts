@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { approximateEquality, EPSILON, forEachMath, using, withMaths } from "./test.utils"
+import { approximateEquality, EPSILON, forEachMath, using, withMaths } from "./test.utils.js"
 
 describe("matrix", using(() => {
 

@@ -1,6 +1,6 @@
 import seedRandom from "seedrandom"
 import { Context, Suite } from "mocha"
-import * as aether from "../../prod"
+import * as aether from "../../prod/index.js"
 import { expect } from "chai"
 import { fail } from "assert"
 

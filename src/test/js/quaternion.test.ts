@@ -1,6 +1,6 @@
 import { expect } from "chai"
-import { quat } from "../../prod"
-import { approximateEquality, using, withMaths } from "./test.utils"
+import { quat } from "../../prod/index.js"
+import { approximateEquality, using, withMaths } from "./test.utils.js"
 
 describe("quaternion", using(() => {
 

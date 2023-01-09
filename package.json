@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "A linear algebra and a basic math/physics library for graphics, gaming, and simulation applications.",
   "main": "index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
-    "test": "nyc --reporter=html -- mocha --require esm --recursive \"./root/aether/test/js/**/*.test.js\"",
+    "test": "nyc --reporter=html -- mocha --recursive \"./root/aether/test/js/**/*.test.js\"",
     "pretest": "tsc --sourceMap false --declarationMap false"
   },
   "repository": {
@@ -27,17 +27,16 @@
   },
   "homepage": "https://github.com/ghadeeras/aether#readme",
   "devDependencies": {
-    "@types/chai": "^4.2.14",
-    "@types/mocha": "^8.2.0",
-    "@types/seedrandom": "^3.0.1",
-    "chai": "^4.3.0",
-    "esm": "^3.2.25",
-    "mocha": "^8.2.1",
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "@types/seedrandom": "^3.0.4",
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0",
     "nyc": "^15.1.0",
     "seedrandom": "^3.0.5",
-    "source-map-support": "^0.5.19"
+    "source-map-support": "^0.5.21"
   },
   "dependencies": {
-    "@types/node": "^14.14.25"
+    "@types/node": "^18.11.18"
   }
 }

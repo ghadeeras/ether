@@ -1,6 +1,6 @@
 import { expect } from "chai"
-import { vec2, vec3 } from "../../prod"
-import { approximateEquality, EPSILON, forEachMath, math2, math3, using } from "./test.utils"
+import { vec2, vec3 } from "../../prod/index.js"
+import { approximateEquality, EPSILON, forEachMath, math2, math3, using } from "./test.utils.js"
 
 describe("vector", using(() => {
 
