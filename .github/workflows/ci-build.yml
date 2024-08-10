@@ -21,20 +21,20 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
-        wabt-version: [1.0.21]
+        node-version: [18.x]
+        wabt-version: [1.0.36]
 
     steps:
     - name: Checkout source code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
 
     - name: Use WABT ${{ matrix.wabt-version }}
-      uses: mwilliamson/setup-wabt-action@v1
+      uses: mwilliamson/setup-wabt-action@v3
       with:
         wabt-version: ${{ matrix.wabt-version }}
 
@@ -57,7 +57,7 @@ jobs:
         cp scripts/release.sh ./root/aether
 
     - name: Switch to 'dist' branch
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         ref: dist
         clean: false

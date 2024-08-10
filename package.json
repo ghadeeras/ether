@@ -27,16 +27,16 @@
   },
   "homepage": "https://github.com/ghadeeras/aether#readme",
   "devDependencies": {
-    "@types/chai": "^4.3.4",
-    "@types/mocha": "^10.0.1",
-    "@types/seedrandom": "^3.0.4",
-    "chai": "^4.3.7",
-    "mocha": "^10.2.0",
-    "nyc": "^15.1.0",
+    "@types/chai": "^4.3.17",
+    "@types/mocha": "^10.0.7",
+    "@types/seedrandom": "^3.0.8",
+    "chai": "^5.1.1",
+    "mocha": "^10.7.3",
+    "nyc": "^17.0.0",
     "seedrandom": "^3.0.5",
     "source-map-support": "^0.5.21"
   },
   "dependencies": {
-    "@types/node": "^18.11.18"
+    "@types/node": "^22.2.0"
   }
 }
