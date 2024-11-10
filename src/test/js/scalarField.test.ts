@@ -128,9 +128,8 @@ function randomSamples(resolution: number): aether.Vec4[][][] {
 
 function loadScalarFieldModule(): aether.ScalarFieldModule {
     const modules = wa.fsLoadModules("./root", {
-        mem: "vibrato.js/latest/wa/mem.wasm",
-        space: "vibrato.js/latest/wa/space.wasm",
-        scalarField: "aether/prod/wa/scalarField.wasm",
+        ...aether.modulePaths,
+        scalarField: aether.modulePaths.scalarField.replace("latest", "prod"),
     })
     return aether.scalarFieldModule(modules)
 }

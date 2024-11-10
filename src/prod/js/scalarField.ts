@@ -18,6 +18,7 @@ export type SamplerExports = {
 }
 
 export const modulePaths = {
+    rawMem: "vibrato.js/latest/wa/rawMem.wasm",
     mem: "vibrato.js/latest/wa/mem.wasm",
     space: "vibrato.js/latest/wa/space.wasm",
     scalarField: "aether/latest/wa/scalarField.wasm",
